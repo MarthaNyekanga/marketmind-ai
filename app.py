@@ -15,10 +15,20 @@ st.title("📊 MarketMind AI Assistant")
 st.write("Helping small businesses make smarter decisions")
 
 # Upload data
-file = st.file_uploader("Upload your sales data", type=["csv"])
+file = st.file_uploader("Upload your sales data", type=["csv", "xlsx", "xls"])
 
 if file:
-    df = pd.read_csv(file)
+    file_type = file.name.split(".")[-1]
+
+    if file_type == "csv":
+        df = pd.read_csv(file)
+
+    elif file_type in ["xlsx", "xls"]:
+        df = pd.read_excel(file)
+
+    else:
+        st.error("Unsupported file type")
+        st.stop()
 
     # 📊 Use your analysis function
     total_sales, best_product = sales_summary(df)
