@@ -13,32 +13,50 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 st.set_page_config(page_title="MarketMind AI", layout="centered")
 
 st.title("📊 MarketMind AI Assistant")
-st.write("Helping small businesses make smarter decisions")
+st.markdown("### Upload your sales file to get insights, predictions, and AI advice")
+
+st.divider()
 
 # Upload file
 file = st.file_uploader("Upload your sales data", type=["csv", "xlsx", "xls"])
 
 if file:
-    # ✅ Read file
+    # 📂 Read file
     file_type = file.name.split(".")[-1]
 
-    if file_type == "csv":
-        df = pd.read_csv(file)
-    elif file_type in ["xlsx", "xls"]:
-        df = pd.read_excel(file)
-    else:
-        st.error("Unsupported file type")
+    try:
+        if file_type == "csv":
+            df = pd.read_csv(file)
+        elif file_type in ["xlsx", "xls"]:
+            df = pd.read_excel(file)
+        else:
+            st.error("Unsupported file type")
+            st.stop()
+
+        # 🧹 Clean data
+        df = clean_data(df)
+
+    except Exception:
+        st.error("Error processing file. Please check format.")
         st.stop()
 
-    # ✅ Clean data
-    df = clean_data(df)
-
-    # ✅ SHOW CLEANED DATA (you were missing this placement)
+    # 🧹 Show cleaned data
     st.subheader("🧹 Cleaned Data Preview")
     st.write(df.head())
 
     st.subheader("📋 Detected Columns")
     st.write(df.columns)
+
+    # 💾 Download cleaned data
+    csv = df.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        "⬇️ Download cleaned data",
+        csv,
+        "cleaned_data.csv",
+        "text/csv"
+    )
+
+    st.divider()
 
     # ✅ Check required columns
     required_columns = ["product", "quantity_sold", "price"]
@@ -48,9 +66,20 @@ if file:
         # 📊 Sales Summary
         total_sales, best_product = sales_summary(df)
 
-        st.subheader("📈 Sales Summary")
-        st.write(f"Total Revenue: {total_sales}")
-        st.write(f"Best Selling Product: {best_product}")
+        st.subheader("📈 Sales Overview")
+
+        col1, col2 = st.columns(2)
+        col1.metric("Total Revenue", f"{total_sales:,.2f}")
+        col2.metric("Best Product", best_product)
+
+        st.divider()
+
+        # 📊 Graph
+        st.subheader("📊 Sales by Product")
+        product_sales = df.groupby("product")["quantity_sold"].sum()
+        st.bar_chart(product_sales)
+
+        st.divider()
 
         # 🔮 Prediction
         st.subheader("🔮 Demand Prediction")
@@ -58,6 +87,39 @@ if file:
 
         prediction = predict_demand(df, product)
         st.write(f"Predicted demand: {prediction}")
+
+        st.divider()
+
+        # 🤖 Auto AI Insights
+        st.subheader("🤖 AI Business Insights")
+
+        try:
+            sample_data = df.head(10).to_string()
+
+            response = client.chat.completions.create(
+                model="gpt-4.1-mini",
+                messages=[{
+                    "role": "user",
+                    "content": f"""
+Analyze this sales data and give:
+- 3 key insights
+- 2 actionable recommendations
+
+Data:
+{sample_data}
+
+Keep it simple and practical.
+"""
+                }]
+            )
+
+            insights = response.choices[0].message.content
+            st.write(insights)
+
+        except Exception as e:
+            st.warning("AI insights temporarily unavailable")
+
+        st.divider()
 
         # 💬 AI Chat
         st.subheader("💬 Ask MarketMind AI")
@@ -74,8 +136,7 @@ Best product: {best_product}
 User question:
 {question}
 
-Give simple, practical advice. Avoid complex terms.
-Explain your reasoning briefly.
+Give simple, practical advice.
 """
 
             try:
