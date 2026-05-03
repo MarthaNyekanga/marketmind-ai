@@ -3,53 +3,68 @@ import pandas as pd
 import os
 from openai import OpenAI
 
-# Import your modules
+from utils.cleaner import clean_data
 from utils.analysis import sales_summary
 from utils.prediction import predict_demand
 
-# 🔑 Secure API key (better practice)
+# 🔑 API
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 st.set_page_config(page_title="MarketMind AI", layout="centered")
 
 st.title("📊 MarketMind AI Assistant")
 st.write("Helping small businesses make smarter decisions")
 
-# Upload data
+# Upload file
 file = st.file_uploader("Upload your sales data", type=["csv", "xlsx", "xls"])
 
 if file:
+    # ✅ Read file
     file_type = file.name.split(".")[-1]
 
     if file_type == "csv":
         df = pd.read_csv(file)
-
     elif file_type in ["xlsx", "xls"]:
         df = pd.read_excel(file)
-
     else:
         st.error("Unsupported file type")
         st.stop()
 
-    # 📊 Use your analysis function
-    total_sales, best_product = sales_summary(df)
+    # ✅ Clean data
+    df = clean_data(df)
 
-    st.subheader("📈 Sales Summary")
-    st.write(f"Total Revenue: {total_sales}")
-    st.write(f"Best Selling Product: {best_product}")
+    # ✅ SHOW CLEANED DATA (you were missing this placement)
+    st.subheader("🧹 Cleaned Data Preview")
+    st.write(df.head())
 
-    # 🔮 Prediction
-    st.subheader("🔮 Demand Prediction")
-    product = st.selectbox("Select product", df["product"].unique())
+    st.subheader("📋 Detected Columns")
+    st.write(df.columns)
 
-    prediction = predict_demand(df, product)
-    st.write(f"Predicted demand: {prediction}")
+    # ✅ Check required columns
+    required_columns = ["product", "quantity_sold", "price"]
 
-    # 💬 AI Chat
-    st.subheader("💬 Ask MarketMind AI")
-    question = st.text_input("Ask a business question")
+    if all(col in df.columns for col in required_columns):
 
-    if question:
-        prompt = f"""
+        # 📊 Sales Summary
+        total_sales, best_product = sales_summary(df)
+
+        st.subheader("📈 Sales Summary")
+        st.write(f"Total Revenue: {total_sales}")
+        st.write(f"Best Selling Product: {best_product}")
+
+        # 🔮 Prediction
+        st.subheader("🔮 Demand Prediction")
+        product = st.selectbox("Select product", df["product"].unique())
+
+        prediction = predict_demand(df, product)
+        st.write(f"Predicted demand: {prediction}")
+
+        # 💬 AI Chat
+        st.subheader("💬 Ask MarketMind AI")
+        question = st.text_input("Ask a business question")
+
+        if question:
+            prompt = f"""
 You are a helpful assistant for small market traders.
 
 Data summary:
@@ -63,14 +78,23 @@ Give simple, practical advice. Avoid complex terms.
 Explain your reasoning briefly.
 """
 
-        try:
-            response = client.chat.completions.create(
-                model="gpt-4.1-mini",
-                messages=[{"role": "user", "content": prompt}]
-            )
+            try:
+                response = client.chat.completions.create(
+                    model="gpt-4.1-mini",
+                    messages=[{"role": "user", "content": prompt}]
+                )
 
-            answer = response.choices[0].message.content
-            st.write(answer)
+                answer = response.choices[0].message.content
+                st.write(answer)
 
-        except Exception as e:
-            st.error(f"Error: {e}")
+            except Exception as e:
+                st.error(f"Error: {e}")
+
+    else:
+        st.warning("⚠️ Your file is missing required columns.")
+        st.write("Detected columns:")
+        st.write(df.columns)
+        st.info("We expect: product, quantity_sold, price")
+
+else:
+    st.info("Please upload a sales data file to continue.")
